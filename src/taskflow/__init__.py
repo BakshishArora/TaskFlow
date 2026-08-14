@@ -1,2 +1,6 @@
 def main() -> None:
-    print("Hello from taskflow!")
+    import uvicorn
+
+    from taskflow.main import app
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
