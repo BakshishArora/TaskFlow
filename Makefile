@@ -1,4 +1,4 @@
-.PHONY: all install-uv install-deps run dev test lint lint-fix format help
+.PHONY: all install-uv install-deps run dev test lint lint-fix format celery help
 
 .DEFAULT_GOAL := help
 
@@ -29,6 +29,9 @@ lint-fix:
 
 format:
 	$(UV) run ruff format
+
+celery:
+	$(UV) run celery -A taskflow.celery_app worker --loglevel=info
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-10s\033[0m %s\n", $$1, $$2}'

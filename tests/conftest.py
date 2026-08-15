@@ -1,6 +1,7 @@
 import os
 
 os.environ["DATABASE_URL"] = "postgresql+psycopg://root:1234@localhost:5432/taskdb_test"
+os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url

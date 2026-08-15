@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from taskflow.db import SessionLocal
 from taskflow.models import Task as TaskModel
 from taskflow.models import TaskStatus
+from taskflow.tasks.notifications import notify_status_change
 from taskflow.utils.validators import validate_due_date, validate_title
 
 
@@ -123,6 +124,7 @@ def update_task(
             return None
         if due_date is not None:
             validate_due_date(due_date)
+        old_status = row.status
         data = Task.model_validate(row).model_dump()
         if status is not None:
             data["status"] = status
@@ -135,7 +137,9 @@ def update_task(
         row.assignee = task.assignee
         row.due_date = task.due_date
         session.commit()
-        return Task.model_validate(row)
+    if task.status != old_status:
+        notify_status_change.delay(task_id, old_status.value, task.status.value)
+    return Task.model_validate(row)
 
 
 def delete_task(task_id: str) -> bool:
