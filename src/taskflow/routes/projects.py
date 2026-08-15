@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from taskflow.controllers import project_tasks, projects
+from taskflow.controllers import projects, tasks
 from taskflow.utils.auth import get_current_user
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -31,4 +31,4 @@ def list_tasks(
     user_id: CurrentUser,
 ):
     _require_owned_project(str(project_id), user_id)
-    return project_tasks.list_tasks(str(project_id))
+    return tasks.list_tasks(str(project_id))

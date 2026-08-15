@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from taskflow.controllers import project_tasks, projects
+from taskflow.controllers import projects, tasks
 from taskflow.main import app
 from taskflow.utils import auth
 
@@ -16,7 +16,7 @@ OWNER_2 = uuid4()
 @pytest.fixture(autouse=True)
 def reset_store():
     projects.clear_projects()
-    project_tasks.clear_tasks()
+    tasks.clear_tasks()
 
 
 @pytest.fixture
@@ -35,8 +35,8 @@ def _create_project(name: str, owner_id: UUID) -> str:
 
 def test_list_tasks_happy_path(auth_header):
     pid = _create_project("Site", owner_id=OWNER_1)
-    project_tasks.create_task(pid, "One")
-    project_tasks.create_task(pid, "Two")
+    tasks.create_task(pid, "One")
+    tasks.create_task(pid, "Two")
     resp = client.get(f"/projects/{pid}/tasks", headers=auth_header)
     assert resp.status_code == 200
     assert [t["title"] for t in resp.json()] == ["One", "Two"]

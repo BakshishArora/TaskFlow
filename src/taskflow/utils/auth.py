@@ -5,9 +5,7 @@ from uuid import UUID
 import jwt
 from fastapi import HTTPException, Request
 
-_SECRET = os.environ.get(
-    "TASKFLOW_SECRET", "s3cr3t"
-)
+_SECRET = os.environ.get("TASKFLOW_SECRET", "s3cr3t")
 _ALGORITHM = "HS256"
 
 

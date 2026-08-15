@@ -1,83 +1,89 @@
-from uuid import UUID, uuid4
+from datetime import date
+from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 
-from taskflow.controllers import tasks
-from taskflow.main import app
+from taskflow.controllers import projects, tasks
 
-client = TestClient(app)
+OWNER_1 = uuid4()
 
 
 @pytest.fixture(autouse=True)
 def reset_store():
+    projects.clear_projects()
     tasks.clear_tasks()
 
 
-def test_create_task():
-    resp = client.post("/tasks", json={"title": "Buy groceries"})
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["title"] == "Buy groceries"
-    assert body["completed"] is False
-    UUID(body["id"])
+@pytest.fixture
+def project_id() -> str:
+    return projects.create_project("Site", owner_id=OWNER_1).id
 
 
-def test_create_task_blank_title_returns_422():
-    resp = client.post("/tasks", json={"title": "  "})
-    assert resp.status_code == 422
+def test_create_and_get(project_id):
+    t = tasks.create_task(project_id, "Build homepage")
+    assert isinstance(t.id, str)
+    assert t.project_id == project_id
+    assert t.status == "todo"
+    assert tasks.get_task(t.id) == t
 
 
-def test_list_tasks():
-    client.post("/tasks", json={"title": "One"})
-    client.post("/tasks", json={"title": "Two"})
-    resp = client.get("/tasks")
-    assert resp.status_code == 200
-    assert [t["title"] for t in resp.json()] == ["One", "Two"]
-
-
-def test_get_task():
-    created = client.post("/tasks", json={"title": "Get me"}).json()
-    resp = client.get(f"/tasks/{created['id']}")
-    assert resp.status_code == 200
-    assert resp.json()["title"] == "Get me"
-
-
-def test_get_missing_task_returns_404():
-    resp = client.get(f"/tasks/{uuid4()}")
-    assert resp.status_code == 404
-
-
-def test_get_invalid_task_id_returns_422():
-    resp = client.get("/tasks/not-a-uuid")
-    assert resp.status_code == 422
-
-
-def test_update_task():
-    created = client.post("/tasks", json={"title": "Old"}).json()
-    resp = client.put(
-        f"/tasks/{created['id']}", json={"title": "New", "completed": True}
+def test_create_with_full_fields(project_id):
+    t = tasks.create_task(
+        project_id,
+        "Ship",
+        status="in_progress",
+        assignee="alice",
+        due_date=date(2026, 9, 1),
+        description="details",
     )
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["title"] == "New"
-    assert body["completed"] is True
+    assert t.status == "in_progress"
+    assert t.assignee == "alice"
+    assert t.due_date == date(2026, 9, 1)
+    assert t.description == "details"
 
 
-def test_update_task_null_title_rejected():
-    created = client.post("/tasks", json={"title": "Old"}).json()
-    resp = client.put(f"/tasks/{created['id']}", json={"title": None})
-    assert resp.status_code == 422
+def test_create_invalid_status_raises(project_id):
+    with pytest.raises(ValueError):
+        tasks.create_task(project_id, "Bad", status="paused")
 
 
-def test_update_task_null_description_rejected():
-    created = client.post("/tasks", json={"title": "Old"}).json()
-    resp = client.put(f"/tasks/{created['id']}", json={"description": None})
-    assert resp.status_code == 422
+def test_create_blank_title_raises(project_id):
+    with pytest.raises(ValueError):
+        tasks.create_task(project_id, "   ")
 
 
-def test_delete_task():
-    created = client.post("/tasks", json={"title": "Gone"}).json()
-    resp = client.delete(f"/tasks/{created['id']}")
-    assert resp.status_code == 204
-    assert client.get(f"/tasks/{created['id']}").status_code == 404
+def test_list_filters_by_project(project_id):
+    tasks.create_task(project_id, "A")
+    tasks.create_task(project_id, "B")
+    other = projects.create_project("Other", owner_id=OWNER_1)
+    tasks.create_task(other.id, "C")
+    assert [t.title for t in tasks.list_tasks(project_id)] == ["A", "B"]
+
+
+def test_get_missing_returns_none():
+    assert tasks.get_task(str(uuid4())) is None
+
+
+def test_update_task(project_id):
+    t = tasks.create_task(project_id, "Old")
+    updated = tasks.update_task(
+        t.id,
+        status="done",
+        assignee="bob",
+        due_date=date(2026, 8, 20),
+    )
+    assert updated.status == "done"
+    assert updated.assignee == "bob"
+    assert updated.due_date == date(2026, 8, 20)
+
+
+def test_update_invalid_status_raises(project_id):
+    t = tasks.create_task(project_id, "Fine")
+    with pytest.raises(ValueError):
+        tasks.update_task(t.id, status="bogus")
+
+
+def test_delete_task(project_id):
+    t = tasks.create_task(project_id, "Gone")
+    assert tasks.delete_task(t.id) is True
+    assert tasks.get_task(t.id) is None
