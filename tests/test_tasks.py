@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -154,6 +154,13 @@ def test_update_invalid_status_raises(project_id):
     t = tasks.create_task(project_id, "Fine", due_date=date(2026, 9, 1))
     with pytest.raises(ValueError):
         tasks.update_task(t.id, status="bogus")
+
+
+def test_update_expired_due_date_raises(project_id):
+    t = tasks.create_task(project_id, "Fine", due_date=date(2026, 9, 1))
+    past = datetime.now(UTC).date() - timedelta(days=1)
+    with pytest.raises(ValueError, match="already expired"):
+        tasks.update_task(t.id, due_date=past)
 
 
 def test_delete_task(project_id):

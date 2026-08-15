@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from taskflow.controllers import projects, tasks
 from taskflow.models import TaskStatus
 from taskflow.utils.auth import get_current_user
-from taskflow.utils.validators import _require_owned_project, validate_title
+from taskflow.utils.validators import (
+    _require_owned_project,
+    validate_due_date,
+    validate_title,
+)
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -56,6 +60,20 @@ class TaskCreate(BaseModel):
     def _validate_title(cls, value: str) -> str:
         validate_title(value)
         return value.strip()
+
+
+class TaskUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: TaskStatus | None = None
+    due_date: date | None = None
+
+    @field_validator("due_date")
+    @classmethod
+    def _validate_due_date(cls, value: date | None) -> date | None:
+        if value is not None:
+            validate_due_date(value)
+        return value
 
 
 @router.post("", status_code=201)
@@ -119,3 +137,21 @@ def create_task(
         due_date=payload.due_date,
         description=payload.description,
     )
+
+
+@router.put("/{project_id}/tasks/{task_id}")
+def update_task(
+    project_id: UUID,
+    task_id: UUID,
+    payload: TaskUpdate,
+    user_id: CurrentUser,
+):
+    _require_owned_project(str(project_id), user_id)
+    updated = tasks.update_task(
+        str(task_id),
+        status=payload.status,
+        due_date=payload.due_date,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    return updated
