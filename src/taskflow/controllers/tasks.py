@@ -1,44 +1,48 @@
-import itertools
-from dataclasses import dataclass
+from uuid import uuid4
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from taskflow.utils.validators import validate_title
 
 
-@dataclass
-class Task:
-    id: int
+class Task(BaseModel):
+    model_config = ConfigDict(validate_assignment=True)
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
     title: str
     description: str = ""
     completed: bool = False
 
+    @field_validator("title")
+    @classmethod
+    def _validate_title(cls, value: str) -> str:
+        validate_title(value)
+        return value.strip()
 
-_tasks: dict[int, Task] = {}
-_ids: itertools.count = itertools.count(1)
+
+_tasks: dict[str, Task] = {}
 
 
 def clear_tasks() -> None:
-    global _ids
     _tasks.clear()
-    _ids = itertools.count(1)
 
 
 def list_tasks() -> list[Task]:
-    return sorted(_tasks.values(), key=lambda t: t.id)
+    return list(_tasks.values())
 
 
 def create_task(title: str, description: str = "") -> Task:
-    validate_title(title)
-    task = Task(id=next(_ids), title=title.strip(), description=description)
+    task = Task(title=title, description=description)
     _tasks[task.id] = task
     return task
 
 
-def get_task(task_id: int) -> Task | None:
+def get_task(task_id: str) -> Task | None:
     return _tasks.get(task_id)
 
 
 def update_task(
-    task_id: int,
+    task_id: str,
     title: str | None = None,
     description: str | None = None,
     completed: bool | None = None,
@@ -47,8 +51,7 @@ def update_task(
     if task is None:
         return None
     if title is not None:
-        validate_title(title)
-        task.title = title.strip()
+        task.title = title
     if description is not None:
         task.description = description
     if completed is not None:
@@ -56,5 +59,5 @@ def update_task(
     return task
 
 
-def delete_task(task_id: int) -> bool:
+def delete_task(task_id: str) -> bool:
     return _tasks.pop(task_id, None) is not None
