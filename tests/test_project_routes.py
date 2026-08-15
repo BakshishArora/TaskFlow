@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID, uuid4
 
 import pytest
@@ -38,8 +39,8 @@ def _create_project(name: str, owner_id: UUID) -> str:
 
 def test_list_tasks_happy_path(auth_header):
     pid = _create_project("Site", owner_id=OWNER_1)
-    tasks.create_task(pid, "One")
-    tasks.create_task(pid, "Two")
+    tasks.create_task(pid, "One", due_date=date(2026, 9, 1))
+    tasks.create_task(pid, "Two", due_date=date(2026, 9, 1))
     resp = client.get(f"/projects/{pid}/tasks", headers=auth_header)
     assert resp.status_code == 200
     assert [t["title"] for t in resp.json()] == ["One", "Two"]
@@ -241,11 +242,116 @@ def test_list_projects_requires_auth():
     assert resp.status_code == 401
 
 
-def test_create_task_endpoint_removed(auth_header):
+def test_create_task(auth_header):
     pid = _create_project("Site", owner_id=OWNER_1)
     resp = client.post(
         f"/projects/{pid}/tasks",
-        json={"title": "X"},
+        json={"title": "Ship it", "due_date": "2026-09-01"},
         headers=auth_header,
     )
-    assert resp.status_code == 405
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["title"] == "Ship it"
+    assert body["project_id"] == pid
+    assert body["status"] == "todo"
+    assert body["due_date"] == "2026-09-01"
+    assert tasks.get_task(body["id"]) is not None
+
+
+def test_create_task_with_full_fields(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={
+            "title": "Ship",
+            "status": "in_progress",
+            "assignee": "alice",
+            "due_date": "2026-09-01",
+            "description": "details",
+        },
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["status"] == "in_progress"
+    assert body["assignee"] == "alice"
+    assert body["due_date"] == "2026-09-01"
+    assert body["description"] == "details"
+
+
+def test_create_task_strips_title(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "  Ship  ", "due_date": "2026-09-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["title"] == "Ship"
+
+
+def test_create_task_rejects_unknown_field(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "Ship", "due_date": "2026-09-01", "id": str(uuid4())},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_create_task_requires_auth():
+    resp = client.post(
+        f"/projects/{uuid4()}/tasks",
+        json={"title": "Ship", "due_date": "2026-09-01"},
+    )
+    assert resp.status_code == 401
+
+
+def test_create_task_blank_title(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "  ", "due_date": "2026-09-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_create_task_missing_due_date(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "Ship"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_create_task_invalid_status(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "Ship", "status": "paused", "due_date": "2026-09-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_create_task_forbidden_other_users_project(other_auth_header):
+    pid = _create_project("Mine", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "Ship", "due_date": "2026-09-01"},
+        headers=other_auth_header,
+    )
+    assert resp.status_code == 403
+
+
+def test_create_task_missing_project_returns_404(auth_header):
+    resp = client.post(
+        f"/projects/{uuid4()}/tasks",
+        json={"title": "Ship", "due_date": "2026-09-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 404

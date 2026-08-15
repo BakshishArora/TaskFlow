@@ -17,7 +17,7 @@ class Task(BaseModel):
     title: str
     status: TaskStatus = TaskStatus.TODO
     assignee: str | None = None
-    due_date: date | None = None
+    due_date: date
     description: str = ""
 
     @field_validator("title")
@@ -38,7 +38,7 @@ def create_task(
     title: str,
     status: TaskStatus = TaskStatus.TODO,
     assignee: str | None = None,
-    due_date: date | None = None,
+    due_date: date = ...,
     description: str = "",
 ) -> Task:
     task = Task(

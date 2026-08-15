@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 from uuid import UUID
 
@@ -5,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from taskflow.controllers import projects, tasks
+from taskflow.models import TaskStatus
 from taskflow.utils.auth import get_current_user
 from taskflow.utils.validators import _require_owned_project, validate_title
 
@@ -40,6 +42,22 @@ class ProjectUpdate(BaseModel):
         return value
 
 
+class TaskCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    status: TaskStatus = TaskStatus.TODO
+    assignee: str | None = None
+    due_date: date
+    description: str = ""
+
+    @field_validator("title")
+    @classmethod
+    def _validate_title(cls, value: str) -> str:
+        validate_title(value)
+        return value.strip()
+
+
 @router.post("", status_code=201)
 def create_project(payload: ProjectCreate, user_id: CurrentUser):
     return projects.create_project(payload.name, owner_id=user_id)
@@ -70,3 +88,20 @@ def list_tasks(
 ):
     _require_owned_project(str(project_id), user_id)
     return tasks.list_tasks(str(project_id))
+
+
+@router.post("/{project_id}/tasks", status_code=201)
+def create_task(
+    project_id: UUID,
+    payload: TaskCreate,
+    user_id: CurrentUser,
+):
+    _require_owned_project(str(project_id), user_id)
+    return tasks.create_task(
+        str(project_id),
+        payload.title,
+        status=payload.status,
+        assignee=payload.assignee,
+        due_date=payload.due_date,
+        description=payload.description,
+    )

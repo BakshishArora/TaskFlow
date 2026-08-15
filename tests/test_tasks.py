@@ -20,11 +20,16 @@ def project_id() -> str:
 
 
 def test_create_and_get(project_id):
-    t = tasks.create_task(project_id, "Build homepage")
+    t = tasks.create_task(project_id, "Build homepage", due_date=date(2026, 9, 1))
     assert isinstance(t.id, str)
     assert t.project_id == project_id
     assert t.status == "todo"
     assert tasks.get_task(t.id) == t
+
+
+def test_create_requires_due_date(project_id):
+    with pytest.raises(ValueError):
+        tasks.create_task(project_id, "No date")
 
 
 def test_create_with_full_fields(project_id):
@@ -44,19 +49,19 @@ def test_create_with_full_fields(project_id):
 
 def test_create_invalid_status_raises(project_id):
     with pytest.raises(ValueError):
-        tasks.create_task(project_id, "Bad", status="paused")
+        tasks.create_task(project_id, "Bad", status="paused", due_date=date(2026, 9, 1))
 
 
 def test_create_blank_title_raises(project_id):
     with pytest.raises(ValueError):
-        tasks.create_task(project_id, "   ")
+        tasks.create_task(project_id, "   ", due_date=date(2026, 9, 1))
 
 
 def test_list_filters_by_project(project_id):
-    tasks.create_task(project_id, "A")
-    tasks.create_task(project_id, "B")
+    tasks.create_task(project_id, "A", due_date=date(2026, 9, 1))
+    tasks.create_task(project_id, "B", due_date=date(2026, 9, 1))
     other = projects.create_project("Other", owner_id=OWNER_1)
-    tasks.create_task(other.id, "C")
+    tasks.create_task(other.id, "C", due_date=date(2026, 9, 1))
     assert [t.title for t in tasks.list_tasks(project_id)] == ["A", "B"]
 
 
@@ -65,7 +70,7 @@ def test_get_missing_returns_none():
 
 
 def test_update_task(project_id):
-    t = tasks.create_task(project_id, "Old")
+    t = tasks.create_task(project_id, "Old", due_date=date(2026, 8, 20))
     updated = tasks.update_task(
         t.id,
         status="done",
@@ -78,12 +83,12 @@ def test_update_task(project_id):
 
 
 def test_update_invalid_status_raises(project_id):
-    t = tasks.create_task(project_id, "Fine")
+    t = tasks.create_task(project_id, "Fine", due_date=date(2026, 9, 1))
     with pytest.raises(ValueError):
         tasks.update_task(t.id, status="bogus")
 
 
 def test_delete_task(project_id):
-    t = tasks.create_task(project_id, "Gone")
+    t = tasks.create_task(project_id, "Gone", due_date=date(2026, 9, 1))
     assert tasks.delete_task(t.id) is True
     assert tasks.get_task(t.id) is None

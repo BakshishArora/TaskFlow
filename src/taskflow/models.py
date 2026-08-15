@@ -57,5 +57,5 @@ class Task(Base):
         default=TaskStatus.TODO,
     )
     assignee: Mapped[str | None] = mapped_column(String, nullable=True)
-    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_date: Mapped[date] = mapped_column(Date, nullable=False)
     description: Mapped[str] = mapped_column(String, nullable=False, default="")
