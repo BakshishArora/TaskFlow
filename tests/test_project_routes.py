@@ -69,9 +69,162 @@ def test_list_tasks_missing_project_returns_404(auth_header):
     assert resp.status_code == 404
 
 
-def test_create_project_endpoint_removed(auth_header):
-    resp = client.post("/projects", json={"name": "X"}, headers=auth_header)
-    assert resp.status_code == 405
+def test_create_project(auth_header):
+    resp = client.post("/projects", json={"name": "Site"}, headers=auth_header)
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["name"] == "Site"
+    assert body["owner_id"] == str(OWNER_1)
+    assert projects.get_project(body["id"]) is not None
+
+
+def test_create_project_strips_name(auth_header):
+    resp = client.post("/projects", json={"name": "  Site  "}, headers=auth_header)
+    assert resp.status_code == 201
+    assert resp.json()["name"] == "Site"
+
+
+def test_create_project_rejects_project_id(auth_header):
+    resp = client.post(
+        "/projects",
+        json={"name": "Site", "id": str(uuid4())},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_create_project_requires_auth():
+    resp = client.post("/projects", json={"name": "Site"})
+    assert resp.status_code == 401
+
+
+def test_create_project_blank_name(auth_header):
+    resp = client.post("/projects", json={"name": "  "}, headers=auth_header)
+    assert resp.status_code == 422
+
+
+def test_update_project(auth_header):
+    pid = _create_project("Old", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={"name": "New", "owner_id": str(OWNER_1)},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "New"
+    assert body["owner_id"] == str(OWNER_1)
+    assert projects.get_project(pid).name == "New"
+
+
+def test_update_project_transfers_ownership(auth_header, other_auth_header):
+    pid = _create_project("Mine", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={"name": "Mine", "owner_id": str(OWNER_2)},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    assert resp.json()["owner_id"] == str(OWNER_2)
+    old_owner = client.put(
+        f"/projects/{pid}",
+        json={"name": "X", "owner_id": str(OWNER_2)},
+        headers=auth_header,
+    )
+    assert old_owner.status_code == 403
+    new_owner = client.put(
+        f"/projects/{pid}",
+        json={"name": "Y", "owner_id": str(OWNER_2)},
+        headers=other_auth_header,
+    )
+    assert new_owner.status_code == 200
+    assert new_owner.json()["name"] == "Y"
+
+
+def test_update_project_requires_auth():
+    resp = client.put(
+        f"/projects/{uuid4()}",
+        json={"name": "X", "owner_id": str(OWNER_1)},
+    )
+    assert resp.status_code == 401
+
+
+def test_update_project_forbidden_other_users_project(other_auth_header):
+    pid = _create_project("Mine", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={"name": "X", "owner_id": str(OWNER_1)},
+        headers=other_auth_header,
+    )
+    assert resp.status_code == 403
+
+
+def test_update_project_missing_returns_404(auth_header):
+    resp = client.put(
+        f"/projects/{uuid4()}",
+        json={"name": "X", "owner_id": str(OWNER_1)},
+        headers=auth_header,
+    )
+    assert resp.status_code == 404
+
+
+def test_update_project_blank_name(auth_header):
+    pid = _create_project("Old", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={"name": "  ", "owner_id": str(OWNER_1)},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_update_project_name_only(auth_header):
+    pid = _create_project("Old", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={"name": "New"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "New"
+    assert body["owner_id"] == str(OWNER_1)
+
+
+def test_update_project_owner_only(auth_header):
+    pid = _create_project("Old", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={"owner_id": str(OWNER_2)},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "Old"
+    assert body["owner_id"] == str(OWNER_2)
+
+
+def test_update_project_empty_payload(auth_header):
+    pid = _create_project("Old", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["name"] == "Old"
+    assert body["owner_id"] == str(OWNER_1)
+
+
+def test_update_project_rejects_unknown_field(auth_header):
+    pid = _create_project("Old", owner_id=OWNER_1)
+    resp = client.put(
+        f"/projects/{pid}",
+        json={"name": "New", "bogus": 1},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
 
 
 def test_list_own_projects(auth_header):

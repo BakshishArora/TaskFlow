@@ -42,6 +42,27 @@ def get_project(project_id: str) -> Project | None:
         return Project.model_validate(row) if row is not None else None
 
 
+def update_project(
+    project_id: str,
+    name: str | None = None,
+    owner_id: UUID | None = None,
+) -> Project | None:
+    with SessionLocal() as session:
+        row = session.get(ProjectModel, project_id)
+        if row is None:
+            return None
+        data = Project.model_validate(row).model_dump()
+        if name is not None:
+            data["name"] = name
+        if owner_id is not None:
+            data["owner_id"] = owner_id
+        project = Project(**data)
+        row.name = project.name
+        row.owner_id = project.owner_id
+        session.commit()
+        return Project.model_validate(row)
+
+
 def list_projects(owner_id: UUID) -> list[Project]:
     with SessionLocal() as session:
         rows = (
