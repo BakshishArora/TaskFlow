@@ -1,3 +1,5 @@
+from uuid import UUID, uuid4
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,11 +20,12 @@ def test_create_task():
     body = resp.json()
     assert body["title"] == "Buy groceries"
     assert body["completed"] is False
+    UUID(body["id"])
 
 
-def test_create_task_blank_title_returns_400():
+def test_create_task_blank_title_returns_422():
     resp = client.post("/tasks", json={"title": "  "})
-    assert resp.status_code == 400
+    assert resp.status_code == 422
 
 
 def test_list_tasks():
@@ -41,8 +44,13 @@ def test_get_task():
 
 
 def test_get_missing_task_returns_404():
-    resp = client.get("/tasks/999")
+    resp = client.get(f"/tasks/{uuid4()}")
     assert resp.status_code == 404
+
+
+def test_get_invalid_task_id_returns_422():
+    resp = client.get("/tasks/not-a-uuid")
+    assert resp.status_code == 422
 
 
 def test_update_task():
@@ -54,6 +62,18 @@ def test_update_task():
     body = resp.json()
     assert body["title"] == "New"
     assert body["completed"] is True
+
+
+def test_update_task_null_title_rejected():
+    created = client.post("/tasks", json={"title": "Old"}).json()
+    resp = client.put(f"/tasks/{created['id']}", json={"title": None})
+    assert resp.status_code == 422
+
+
+def test_update_task_null_description_rejected():
+    created = client.post("/tasks", json={"title": "Old"}).json()
+    resp = client.put(f"/tasks/{created['id']}", json={"description": None})
+    assert resp.status_code == 422
 
 
 def test_delete_task():

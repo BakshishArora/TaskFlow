@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import pytest
 
 from taskflow.controllers import tasks
@@ -10,7 +12,7 @@ def reset_store():
 
 def test_create_and_get():
     t = tasks.create_task("Buy groceries", "milk, eggs")
-    assert t.id == 1
+    assert isinstance(t.id, str)
     assert t.title == "Buy groceries"
     assert tasks.get_task(t.id) == t
 
@@ -27,7 +29,7 @@ def test_create_blank_title_raises():
 
 
 def test_get_missing_returns_none():
-    assert tasks.get_task(999) is None
+    assert tasks.get_task(str(uuid4())) is None
 
 
 def test_update_task():
@@ -44,7 +46,7 @@ def test_update_blank_title_raises():
 
 
 def test_update_missing_returns_none():
-    assert tasks.update_task(999, title="X") is None
+    assert tasks.update_task(str(uuid4()), title="X") is None
 
 
 def test_delete_task():
@@ -54,4 +56,4 @@ def test_delete_task():
 
 
 def test_delete_missing_returns_false():
-    assert tasks.delete_task(999) is False
+    assert tasks.delete_task(str(uuid4())) is False
