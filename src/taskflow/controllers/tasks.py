@@ -9,6 +9,8 @@ from taskflow.models import TaskStatus
 from taskflow.tasks.notifications import notify_status_change
 from taskflow.utils.validators import validate_due_date, validate_title
 
+_UNSET = object()
+
 
 class Task(BaseModel):
     model_config = ConfigDict(validate_assignment=True, from_attributes=True)
@@ -115,7 +117,7 @@ def get_task(task_id: str) -> Task | None:
 def update_task(
     task_id: str,
     status: TaskStatus | None = None,
-    assignee: str | None = None,
+    assignee: str | None | object = _UNSET,
     due_date: date | None = None,
 ) -> Task | None:
     with SessionLocal() as session:
@@ -128,7 +130,7 @@ def update_task(
         data = Task.model_validate(row).model_dump()
         if status is not None:
             data["status"] = status
-        if assignee is not None:
+        if assignee is not _UNSET:
             data["assignee"] = assignee
         if due_date is not None:
             data["due_date"] = due_date

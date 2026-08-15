@@ -328,7 +328,7 @@ def test_create_task_with_full_fields(auth_header):
         json={
             "title": "Ship",
             "status": "in_progress",
-            "assignee": "alice",
+            "assignee": str(OWNER_1),
             "due_date": "2026-09-01",
             "description": "details",
         },
@@ -337,9 +337,29 @@ def test_create_task_with_full_fields(auth_header):
     assert resp.status_code == 201
     body = resp.json()
     assert body["status"] == "in_progress"
-    assert body["assignee"] == "alice"
+    assert body["assignee"] == str(OWNER_1)
     assert body["due_date"] == "2026-09-01"
     assert body["description"] == "details"
+
+
+def test_create_task_unknown_assignee_returns_422(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "Ship", "assignee": str(uuid4()), "due_date": "2026-09-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_create_task_malformed_assignee_returns_422(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "Ship", "assignee": "not-a-uuid", "due_date": "2026-09-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
 
 
 def test_create_task_strips_title(auth_header):
@@ -463,6 +483,69 @@ def test_update_task_due_date_only(auth_header):
     body = resp.json()
     assert body["status"] == "todo"
     assert body["due_date"] == "2026-11-01"
+
+
+def test_update_task_assignee(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "Old", due_date=date(2026, 9, 1)).id
+    resp = client.put(
+        f"/projects/{pid}/tasks/{tid}",
+        json={"assignee": str(OWNER_1)},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["assignee"] == str(OWNER_1)
+    assert tasks.get_task(tid).assignee == str(OWNER_1)
+
+
+def test_update_task_unknown_assignee_returns_422(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "Old", due_date=date(2026, 9, 1)).id
+    resp = client.put(
+        f"/projects/{pid}/tasks/{tid}",
+        json={"assignee": str(uuid4())},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_update_task_malformed_assignee_returns_422(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "Old", due_date=date(2026, 9, 1)).id
+    resp = client.put(
+        f"/projects/{pid}/tasks/{tid}",
+        json={"assignee": "not-a-uuid"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_update_task_clear_assignee(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "Old", assignee="alice", due_date=date(2026, 9, 1)).id
+    resp = client.put(
+        f"/projects/{pid}/tasks/{tid}",
+        json={"assignee": None},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["assignee"] is None
+    assert tasks.get_task(tid).assignee is None
+
+
+def test_update_task_assignee_untouched_when_omitted(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "Old", assignee="alice", due_date=date(2026, 9, 1)).id
+    resp = client.put(
+        f"/projects/{pid}/tasks/{tid}",
+        json={"status": "done"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["assignee"] == "alice"
 
 
 def test_update_task_empty_payload(auth_header):

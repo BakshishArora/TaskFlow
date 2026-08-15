@@ -150,6 +150,26 @@ def test_update_task(project_id):
     assert updated.due_date == date(2026, 8, 20)
 
 
+def test_update_task_assignee(project_id):
+    t = tasks.create_task(project_id, "Old", due_date=date(2026, 9, 1))
+    updated = tasks.update_task(t.id, assignee="bob")
+    assert updated.assignee == "bob"
+    assert tasks.get_task(t.id).assignee == "bob"
+
+
+def test_update_task_clear_assignee(project_id):
+    t = tasks.create_task(project_id, "Old", assignee="alice", due_date=date(2026, 9, 1))
+    updated = tasks.update_task(t.id, assignee=None)
+    assert updated.assignee is None
+    assert tasks.get_task(t.id).assignee is None
+
+
+def test_update_task_omit_assignee_unchanged(project_id):
+    t = tasks.create_task(project_id, "Old", assignee="alice", due_date=date(2026, 9, 1))
+    updated = tasks.update_task(t.id, status="done")
+    assert updated.assignee == "alice"
+
+
 def test_update_invalid_status_raises(project_id):
     t = tasks.create_task(project_id, "Fine", due_date=date(2026, 9, 1))
     with pytest.raises(ValueError):

@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from taskflow.controllers import projects, tasks
+from taskflow.controllers import projects, tasks, users
 from taskflow.models import TaskStatus
 from taskflow.utils.auth import get_current_user
 from taskflow.utils.validators import (
@@ -17,6 +17,18 @@ from taskflow.utils.validators import (
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 CurrentUser = Annotated[UUID, Depends(get_current_user)]
+
+
+def _validate_assignee(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        user_id = UUID(value)
+    except ValueError as exc:
+        raise ValueError("assignee must be a valid user id") from exc
+    if users.get_user_by_id(user_id) is None:
+        raise ValueError("assignee user not found")
+    return value
 
 
 class ProjectCreate(BaseModel):
@@ -61,11 +73,17 @@ class TaskCreate(BaseModel):
         validate_title(value)
         return value.strip()
 
+    @field_validator("assignee")
+    @classmethod
+    def _validate_assignee_field(cls, value: str | None) -> str | None:
+        return _validate_assignee(value)
+
 
 class TaskUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     status: TaskStatus | None = None
+    assignee: str | None = None
     due_date: date | None = None
 
     @field_validator("due_date")
@@ -74,6 +92,11 @@ class TaskUpdate(BaseModel):
         if value is not None:
             validate_due_date(value)
         return value
+
+    @field_validator("assignee")
+    @classmethod
+    def _validate_assignee_field(cls, value: str | None) -> str | None:
+        return _validate_assignee(value)
 
 
 @router.post("", status_code=201)
@@ -150,6 +173,7 @@ def update_task(
     updated = tasks.update_task(
         str(task_id),
         status=payload.status,
+        assignee=payload.assignee if "assignee" in payload.model_fields_set else tasks._UNSET,
         due_date=payload.due_date,
     )
     if updated is None:
