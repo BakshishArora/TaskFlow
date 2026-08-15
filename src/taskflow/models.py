@@ -30,6 +30,14 @@ class Project(Base):
     owner_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    username: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+
+
 class Task(Base):
     __tablename__ = "tasks"
 
