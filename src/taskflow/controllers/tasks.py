@@ -27,6 +27,13 @@ class Task(BaseModel):
         return value.strip()
 
 
+class TaskPage(BaseModel):
+    items: list[Task]
+    total: int
+    page: int
+    page_size: int
+
+
 def clear_tasks() -> None:
     with SessionLocal() as session:
         session.query(TaskModel).delete()
@@ -64,10 +71,38 @@ def create_task(
     return task
 
 
-def list_tasks(project_id: str) -> list[Task]:
+def list_tasks(
+    project_id: str,
+    status: TaskStatus | None = None,
+    assignee: str | None = None,
+    due_from: date | None = None,
+    due_to: date | None = None,
+    page: int = 1,
+    page_size: int = 20,
+) -> TaskPage:
     with SessionLocal() as session:
-        rows = session.query(TaskModel).filter(TaskModel.project_id == project_id).all()
-        return [Task.model_validate(row) for row in rows]
+        query = session.query(TaskModel).filter(TaskModel.project_id == project_id)
+        if status is not None:
+            query = query.filter(TaskModel.status == status)
+        if assignee:
+            query = query.filter(TaskModel.assignee == assignee)
+        if due_from is not None:
+            query = query.filter(TaskModel.due_date >= due_from)
+        if due_to is not None:
+            query = query.filter(TaskModel.due_date <= due_to)
+        total = query.count()
+        rows = (
+            query.order_by(TaskModel.due_date, TaskModel.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        return TaskPage(
+            items=[Task.model_validate(row) for row in rows],
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
 
 
 def get_task(task_id: str) -> Task | None:

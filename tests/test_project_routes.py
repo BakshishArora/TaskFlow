@@ -43,7 +43,70 @@ def test_list_tasks_happy_path(auth_header):
     tasks.create_task(pid, "Two", due_date=date(2026, 9, 1))
     resp = client.get(f"/projects/{pid}/tasks", headers=auth_header)
     assert resp.status_code == 200
-    assert [t["title"] for t in resp.json()] == ["One", "Two"]
+    body = resp.json()
+    assert sorted(t["title"] for t in body["items"]) == ["One", "Two"]
+    assert body["total"] == 2
+    assert body["page"] == 1
+    assert body["page_size"] == 20
+
+
+def test_list_tasks_filters_and_paginates(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tasks.create_task(
+        pid, "Done alice", status="done", assignee="alice",
+        due_date=date(2026, 8, 15),
+    )
+    tasks.create_task(
+        pid, "Todo alice", assignee="alice", due_date=date(2026, 9, 1),
+    )
+    tasks.create_task(
+        pid, "Todo bob", assignee="bob", due_date=date(2026, 10, 1),
+    )
+    resp = client.get(
+        f"/projects/{pid}/tasks",
+        params={"status": "done", "assignee": "alice", "page": 1, "page_size": 1},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert [t["title"] for t in body["items"]] == ["Done alice"]
+    assert body["total"] == 1
+
+
+def test_list_tasks_due_date_range(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tasks.create_task(pid, "Aug", due_date=date(2026, 8, 15))
+    tasks.create_task(pid, "Sep", due_date=date(2026, 9, 1))
+    tasks.create_task(pid, "Oct", due_date=date(2026, 10, 1))
+    resp = client.get(
+        f"/projects/{pid}/tasks",
+        params={"due_from": "2026-09-01", "due_to": "2026-10-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert sorted(t["title"] for t in body["items"]) == ["Oct", "Sep"]
+    assert body["total"] == 2
+
+
+def test_list_tasks_invalid_status_returns_422(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.get(
+        f"/projects/{pid}/tasks",
+        params={"status": "paused"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
+
+
+def test_list_tasks_invalid_date_returns_422(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.get(
+        f"/projects/{pid}/tasks",
+        params={"due_from": "not-a-date"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 422
 
 
 def test_list_tasks_requires_auth():

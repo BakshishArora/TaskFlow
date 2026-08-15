@@ -2,7 +2,7 @@ from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from taskflow.controllers import projects, tasks
@@ -85,9 +85,23 @@ def list_projects(user_id: CurrentUser):
 def list_tasks(
     project_id: UUID,
     user_id: CurrentUser,
+    status: TaskStatus | None = None,
+    assignee: str | None = None,
+    due_from: date | None = None,
+    due_to: date | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
     _require_owned_project(str(project_id), user_id)
-    return tasks.list_tasks(str(project_id))
+    return tasks.list_tasks(
+        str(project_id),
+        status=status,
+        assignee=assignee,
+        due_from=due_from,
+        due_to=due_to,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.post("/{project_id}/tasks", status_code=201)

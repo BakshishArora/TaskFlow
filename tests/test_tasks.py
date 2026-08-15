@@ -62,7 +62,75 @@ def test_list_filters_by_project(project_id):
     tasks.create_task(project_id, "B", due_date=date(2026, 9, 1))
     other = projects.create_project("Other", owner_id=OWNER_1)
     tasks.create_task(other.id, "C", due_date=date(2026, 9, 1))
-    assert [t.title for t in tasks.list_tasks(project_id)] == ["A", "B"]
+    page = tasks.list_tasks(project_id)
+    assert sorted(t.title for t in page.items) == ["A", "B"]
+    assert page.total == 2
+
+
+def test_list_filters_by_status(project_id):
+    done = tasks.create_task(project_id, "Done", due_date=date(2026, 9, 1))
+    tasks.update_task(done.id, status="done", due_date=date(2026, 9, 1))
+    tasks.create_task(project_id, "Todo", due_date=date(2026, 9, 1))
+    page = tasks.list_tasks(project_id, status="done")
+    assert [t.title for t in page.items] == ["Done"]
+    assert page.total == 1
+
+
+def test_list_filters_by_assignee(project_id):
+    tasks.create_task(project_id, "Mine", assignee="alice", due_date=date(2026, 9, 1))
+    tasks.create_task(project_id, "Yours", assignee="bob", due_date=date(2026, 9, 1))
+    tasks.create_task(project_id, "Nobody", due_date=date(2026, 9, 1))
+    page = tasks.list_tasks(project_id, assignee="alice")
+    assert [t.title for t in page.items] == ["Mine"]
+
+
+def test_list_empty_assignee_ignored(project_id):
+    tasks.create_task(project_id, "Mine", assignee="alice", due_date=date(2026, 9, 1))
+    page = tasks.list_tasks(project_id, assignee="")
+    assert [t.title for t in page.items] == ["Mine"]
+
+
+def test_list_filters_by_due_date_range(project_id):
+    tasks.create_task(project_id, "Aug", due_date=date(2026, 8, 15))
+    tasks.create_task(project_id, "Sep", due_date=date(2026, 9, 1))
+    tasks.create_task(project_id, "Oct", due_date=date(2026, 10, 1))
+    page = tasks.list_tasks(project_id, due_from=date(2026, 9, 1), due_to=date(2026, 10, 1))
+    assert [t.title for t in page.items] == ["Sep", "Oct"]
+    assert page.total == 2
+
+
+def test_list_filters_combine(project_id):
+    done = tasks.create_task(
+        project_id, "Done alice", assignee="alice", due_date=date(2026, 8, 15)
+    )
+    tasks.update_task(done.id, status="done", due_date=date(2026, 8, 15))
+    tasks.create_task(project_id, "Todo alice", assignee="alice", due_date=date(2026, 9, 1))
+    page = tasks.list_tasks(project_id, status="done", assignee="alice")
+    assert [t.title for t in page.items] == ["Done alice"]
+
+
+def test_list_orders_by_due_date_then_id(project_id):
+    tasks.create_task(project_id, "Late", due_date=date(2026, 10, 1))
+    tasks.create_task(project_id, "Early", due_date=date(2026, 8, 15))
+    tasks.create_task(project_id, "Mid", due_date=date(2026, 9, 1))
+    page = tasks.list_tasks(project_id)
+    assert [t.title for t in page.items] == ["Early", "Mid", "Late"]
+
+
+def test_list_paginates(project_id):
+    for title in ["A", "B", "C", "D", "E"]:
+        tasks.create_task(project_id, title, due_date=date(2026, 9, 1))
+    seen = []
+    for page in (1, 2, 3):
+        result = tasks.list_tasks(project_id, page=page, page_size=2)
+        seen.extend(t.title for t in result.items)
+    assert sorted(seen) == ["A", "B", "C", "D", "E"]
+    assert len(seen) == len(set(seen))
+    first = tasks.list_tasks(project_id, page=2, page_size=2)
+    assert first.total == 5
+    assert first.page == 2
+    assert first.page_size == 2
+    assert len(first.items) == 2
 
 
 def test_get_missing_returns_none():
