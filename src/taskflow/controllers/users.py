@@ -1,4 +1,4 @@
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -21,16 +21,24 @@ def clear_users() -> None:
         session.commit()
 
 
-def get_user_by_username(username: str) -> User | None:
+def get_user_by_id(user_id: UUID) -> User | None:
     with SessionLocal() as session:
-        row = (
-            session.query(UserModel).filter(UserModel.username == username).first()
-        )
+        row = session.query(UserModel).filter(UserModel.id == str(user_id)).first()
         return User.model_validate(row) if row is not None else None
 
 
-def create_user(username: str, password: str) -> User:
-    user = User(username=username, password_hash=hash_password(password))
+def get_user_by_username(username: str) -> User | None:
+    with SessionLocal() as session:
+        row = session.query(UserModel).filter(UserModel.username == username).first()
+        return User.model_validate(row) if row is not None else None
+
+
+def create_user(username: str, password: str, user_id: UUID | None = None) -> User:
+    user = User(
+        id=str(user_id) if user_id is not None else str(uuid4()),
+        username=username,
+        password_hash=hash_password(password),
+    )
     with SessionLocal() as session:
         row = UserModel(
             id=user.id,

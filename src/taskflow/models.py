@@ -34,7 +34,9 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
-    username: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    username: Mapped[str] = mapped_column(
+        String, nullable=False, unique=True, index=True
+    )
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
 
 

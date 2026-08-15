@@ -1,12 +1,18 @@
 import os
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 from uuid import UUID
 
 import jwt
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from taskflow.controllers import users
 
 _SECRET = os.environ.get("TASKFLOW_SECRET", "s3cr3t")
 _ALGORITHM = "HS256"
+
+bearer = HTTPBearer(auto_error=False)
 
 
 def create_token(user_id: UUID, secret: str | None = None) -> str:
@@ -25,8 +31,12 @@ def decode_token(token: str, secret: str | None = None) -> UUID:
     return UUID(payload["sub"])
 
 
-def get_current_user(request: Request) -> UUID:
-    header = request.headers.get("Authorization")
-    if not header or not header.startswith("Bearer "):
+def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)] = None,
+) -> UUID:
+    if credentials is None:
         raise HTTPException(status_code=401, detail="missing authorization header")
-    return decode_token(header.removeprefix("Bearer "))
+    user_id = decode_token(credentials.credentials)
+    if users.get_user_by_id(user_id) is None:
+        raise HTTPException(status_code=401, detail="user not found")
+    return user_id

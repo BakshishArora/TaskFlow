@@ -3,7 +3,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from taskflow.controllers import projects, tasks
+from taskflow.controllers import projects, tasks, users
 from taskflow.main import app
 from taskflow.utils import auth
 
@@ -17,6 +17,9 @@ OWNER_2 = uuid4()
 def reset_store():
     projects.clear_projects()
     tasks.clear_tasks()
+    users.clear_users()
+    users.create_user("owner1", "pw12345", user_id=OWNER_1)
+    users.create_user("owner2", "pw12345", user_id=OWNER_2)
 
 
 @pytest.fixture
