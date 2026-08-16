@@ -265,3 +265,5 @@ docker run -p 8000:8000 taskflow
 - Currently the requests are handled synchronously, i.e. multiple requests from the user are based on timestamp and are executed in a blocking manner. If I had more time I would hav created the mechanism asynchronously.
 
 - There is a no friction on-boarding i.e. whenever a new user tries to access the api, it can without going through a robust mechanism of SignUp. If I had more time I would have established a robust mechanism for user registration and email verification. 
+
+- In current deployment, the DELETE Apis execute hard deletion, it removes users, projects and tasks completely without any backup. If I would have had more time I would have implemented soft deletion mechanism.
