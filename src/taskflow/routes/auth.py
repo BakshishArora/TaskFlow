@@ -27,6 +27,10 @@ def login(payload: LoginRequest) -> dict[str, str]:
         raise HTTPException(status_code=401, detail="invalid credentials")
     return {"token": create_token(user_id=UUID(user.id))}
 
+@router.get("/users")
+def get_users(current_user: CurrentUser) -> dict[str, str]:
+    user = users.get_user_by_id(current_user)
+    return user.model_dump(exclude={"password_hash"})
 
 @router.delete("/users")
 def delete_user(current_user: CurrentUser) -> dict[str, str]:
