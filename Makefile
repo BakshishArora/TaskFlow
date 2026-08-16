@@ -1,4 +1,4 @@
-.PHONY: all install-uv install-deps run dev test lint lint-fix format celery help
+.PHONY: all install-uv install-deps run dev test lint lint-fix format format-check celery help
 
 .DEFAULT_GOAL := help
 
@@ -29,6 +29,9 @@ lint-fix:
 
 format:
 	$(UV) run ruff format
+
+format-check:
+	$(UV) run ruff format --check
 
 celery:
 	$(UV) run celery -A taskflow.celery_app worker --loglevel=info
