@@ -61,14 +61,23 @@ def test_list_tasks_happy_path(auth_header):
 def test_list_tasks_filters_and_paginates(auth_header):
     pid = _create_project("Site", owner_id=OWNER_1)
     tasks.create_task(
-        pid, "Done alice", status="done", assignee="alice",
+        pid,
+        "Done alice",
+        status="done",
+        assignee="alice",
         due_date=date(2026, 8, 15),
     )
     tasks.create_task(
-        pid, "Todo alice", assignee="alice", due_date=date(2026, 9, 1),
+        pid,
+        "Todo alice",
+        assignee="alice",
+        due_date=date(2026, 9, 1),
     )
     tasks.create_task(
-        pid, "Todo bob", assignee="bob", due_date=date(2026, 10, 1),
+        pid,
+        "Todo bob",
+        assignee="bob",
+        due_date=date(2026, 10, 1),
     )
     resp = client.get(
         f"/projects/{pid}/tasks",
@@ -183,9 +192,7 @@ def test_list_tasks_filtered_uses_separate_key(auth_header):
     pid = _create_project("Site", owner_id=OWNER_1)
     tasks.create_task(pid, "One", due_date=date(2026, 9, 1))
     client.get(f"/projects/{pid}/tasks", headers=auth_header)
-    client.get(
-        f"/projects/{pid}/tasks", params={"status": "todo"}, headers=auth_header
-    )
+    client.get(f"/projects/{pid}/tasks", params={"status": "todo"}, headers=auth_header)
     assert len(_task_cache_keys(pid)) == 2
 
 
@@ -782,9 +789,7 @@ def test_delete_task_forbidden_other_users_project(other_auth_header):
 
 
 def test_delete_task_missing_project_returns_404(auth_header):
-    resp = client.delete(
-        f"/projects/{uuid4()}/tasks/{uuid4()}", headers=auth_header
-    )
+    resp = client.delete(f"/projects/{uuid4()}/tasks/{uuid4()}", headers=auth_header)
     assert resp.status_code == 404
 
 

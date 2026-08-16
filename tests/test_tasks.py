@@ -96,7 +96,9 @@ def test_list_filters_by_due_date_range(project_id):
     tasks.create_task(project_id, "Aug", due_date=date(2026, 8, 15))
     tasks.create_task(project_id, "Sep", due_date=date(2026, 9, 1))
     tasks.create_task(project_id, "Oct", due_date=date(2026, 10, 1))
-    page = tasks.list_tasks(project_id, due_from=date(2026, 9, 1), due_to=date(2026, 10, 1))
+    page = tasks.list_tasks(
+        project_id, due_from=date(2026, 9, 1), due_to=date(2026, 10, 1)
+    )
     assert [t.title for t in page.items] == ["Sep", "Oct"]
     assert page.total == 2
 
@@ -160,14 +162,18 @@ def test_update_task_assignee(project_id):
 
 
 def test_update_task_clear_assignee(project_id):
-    t = tasks.create_task(project_id, "Old", assignee="alice", due_date=date(2026, 9, 1))
+    t = tasks.create_task(
+        project_id, "Old", assignee="alice", due_date=date(2026, 9, 1)
+    )
     updated = tasks.update_task(t.id, assignee=None)
     assert updated.assignee is None
     assert tasks.get_task(t.id).assignee is None
 
 
 def test_update_task_omit_assignee_unchanged(project_id):
-    t = tasks.create_task(project_id, "Old", assignee="alice", due_date=date(2026, 9, 1))
+    t = tasks.create_task(
+        project_id, "Old", assignee="alice", due_date=date(2026, 9, 1)
+    )
     updated = tasks.update_task(t.id, status="done")
     assert updated.assignee == "alice"
 

@@ -79,11 +79,11 @@ def test_delete_user_orphans_projects_and_tasks():
     pid = projects.create_project("Mine", owner_id=owner_id).id
     other_pid = projects.create_project("Other", owner_id=other_id).id
     tid = tasks.create_task(pid, "In my project", due_date=date(2026, 9, 1)).id
-    other_tid = tasks.create_task(
-        other_pid, "Not mine", due_date=date(2026, 9, 1)
-    ).id
+    other_tid = tasks.create_task(other_pid, "Not mine", due_date=date(2026, 9, 1)).id
     assigned_tid = tasks.create_task(
-        other_pid, "Assigned to me", assignee=str(owner_id),
+        other_pid,
+        "Assigned to me",
+        assignee=str(owner_id),
         due_date=date(2026, 9, 1),
     ).id
 

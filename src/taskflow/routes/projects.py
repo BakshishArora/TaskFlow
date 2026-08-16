@@ -189,7 +189,9 @@ def update_task(
     updated = tasks.update_task(
         str(task_id),
         status=payload.status,
-        assignee=payload.assignee if "assignee" in payload.model_fields_set else tasks._UNSET,
+        assignee=payload.assignee
+        if "assignee" in payload.model_fields_set
+        else tasks._UNSET,
         due_date=payload.due_date,
     )
     if updated is None:
