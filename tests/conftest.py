@@ -3,6 +3,8 @@ import os
 os.environ["DATABASE_URL"] = "postgresql+psycopg://root:1234@localhost:5432/taskdb_test"
 os.environ["CELERY_TASK_ALWAYS_EAGER"] = "true"
 
+import pytest
+from redis import Redis
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
@@ -28,3 +30,8 @@ def _ensure_test_database() -> None:
 _ensure_test_database()
 Base.metadata.drop_all(bind=engine)
 Base.metadata.create_all(bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def flush_redis():
+    Redis.from_url("redis://localhost:6379/0").flushdb()

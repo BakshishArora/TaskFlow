@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from taskflow.controllers import projects, tasks, users
 from taskflow.models import TaskStatus
 from taskflow.utils.auth import get_current_user
+from taskflow.utils.cache import get_tasks, invalidate_tasks, set_tasks
 from taskflow.utils.validators import (
     _require_owned_project,
     validate_due_date,
@@ -134,7 +135,18 @@ def list_tasks(
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ):
     _require_owned_project(str(project_id), user_id)
-    return tasks.list_tasks(
+    params = {
+        "status": status,
+        "assignee": assignee,
+        "due_from": due_from,
+        "due_to": due_to,
+        "page": page,
+        "page_size": page_size,
+    }
+    cached = get_tasks(str(project_id), params)
+    if cached is not None:
+        return cached
+    result = tasks.list_tasks(
         str(project_id),
         status=status,
         assignee=assignee,
@@ -143,6 +155,8 @@ def list_tasks(
         page=page,
         page_size=page_size,
     )
+    set_tasks(str(project_id), params, result.model_dump(mode="json"))
+    return result
 
 
 @router.post("/{project_id}/tasks", status_code=201)
@@ -152,7 +166,7 @@ def create_task(
     user_id: CurrentUser,
 ):
     _require_owned_project(str(project_id), user_id)
-    return tasks.create_task(
+    result = tasks.create_task(
         str(project_id),
         payload.title,
         status=payload.status,
@@ -160,6 +174,8 @@ def create_task(
         due_date=payload.due_date,
         description=payload.description,
     )
+    invalidate_tasks(str(project_id))
+    return result
 
 
 @router.put("/{project_id}/tasks/{task_id}")
@@ -178,6 +194,7 @@ def update_task(
     )
     if updated is None:
         raise HTTPException(status_code=404, detail="task not found")
+    invalidate_tasks(str(project_id))
     return updated
 
 
@@ -187,6 +204,7 @@ def delete_project(project_id: UUID, user_id: CurrentUser):
     deleted = projects.delete_project(str(project_id))
     if deleted is None:
         raise HTTPException(status_code=404, detail="project not found")
+    invalidate_tasks(str(project_id))
     return deleted
 
 
@@ -196,4 +214,5 @@ def delete_task(project_id: UUID, task_id: UUID, user_id: CurrentUser):
     deleted = tasks.delete_task(str(task_id))
     if deleted is None:
         raise HTTPException(status_code=404, detail="task not found")
+    invalidate_tasks(str(project_id))
     return deleted

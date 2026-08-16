@@ -1,8 +1,10 @@
+import json
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from redis import Redis
 
 from taskflow.controllers import projects, tasks, users
 from taskflow.main import app
@@ -10,8 +12,14 @@ from taskflow.utils import auth
 
 client = TestClient(app)
 
+_redis = Redis.from_url("redis://localhost:6379/0", decode_responses=True)
+
 OWNER_1 = uuid4()
 OWNER_2 = uuid4()
+
+
+def _task_cache_keys(pid: str) -> list[str]:
+    return sorted(_redis.scan_iter(f"tasks_of_{pid}:*"))
 
 
 @pytest.fixture(autouse=True)
@@ -131,6 +139,102 @@ def test_list_tasks_forbidden_other_users_project(other_auth_header):
 def test_list_tasks_missing_project_returns_404(auth_header):
     resp = client.get(f"/projects/{uuid4()}/tasks", headers=auth_header)
     assert resp.status_code == 404
+
+
+def test_list_tasks_populates_cache(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tasks.create_task(pid, "One", due_date=date(2026, 9, 1))
+    resp = client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    assert resp.status_code == 200
+    keys = _task_cache_keys(pid)
+    assert len(keys) == 1
+    assert json.loads(_redis.get(keys[0])) == resp.json()
+
+
+def test_list_tasks_serves_from_cache(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tasks.create_task(pid, "One", due_date=date(2026, 9, 1))
+    client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    keys = _task_cache_keys(pid)
+    assert keys, "expected a cached entry"
+    fake = {
+        "items": [
+            {
+                "id": str(uuid4()),
+                "project_id": pid,
+                "title": "Fake cached",
+                "status": "todo",
+                "assignee": None,
+                "due_date": "2026-09-01",
+                "description": "",
+            }
+        ],
+        "total": 1,
+        "page": 1,
+        "page_size": 20,
+    }
+    _redis.set(keys[0], json.dumps(fake))
+    resp = client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    assert resp.status_code == 200
+    assert resp.json() == fake
+
+
+def test_list_tasks_filtered_uses_separate_key(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tasks.create_task(pid, "One", due_date=date(2026, 9, 1))
+    client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    client.get(
+        f"/projects/{pid}/tasks", params={"status": "todo"}, headers=auth_header
+    )
+    assert len(_task_cache_keys(pid)) == 2
+
+
+def test_create_task_invalidates_cache(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tasks.create_task(pid, "One", due_date=date(2026, 9, 1))
+    client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    assert _task_cache_keys(pid)
+    resp = client.post(
+        f"/projects/{pid}/tasks",
+        json={"title": "Two", "due_date": "2026-09-01"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 201
+    assert _task_cache_keys(pid) == []
+
+
+def test_update_task_invalidates_cache(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "One", due_date=date(2026, 9, 1)).id
+    client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    assert _task_cache_keys(pid)
+    resp = client.put(
+        f"/projects/{pid}/tasks/{tid}",
+        json={"status": "done"},
+        headers=auth_header,
+    )
+    assert resp.status_code == 200
+    assert _task_cache_keys(pid) == []
+
+
+def test_delete_task_invalidates_cache(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "One", due_date=date(2026, 9, 1)).id
+    client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    assert _task_cache_keys(pid)
+    resp = client.delete(f"/projects/{pid}/tasks/{tid}", headers=auth_header)
+    assert resp.status_code == 200
+    assert _task_cache_keys(pid) == []
+
+
+def test_delete_project_invalidates_cache(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tasks.create_task(pid, "One", due_date=date(2026, 9, 1))
+    client.get(f"/projects/{pid}/tasks", headers=auth_header)
+    assert _task_cache_keys(pid)
+    resp = client.delete(f"/projects/{pid}", headers=auth_header)
+    assert resp.status_code == 200
+    assert _task_cache_keys(pid) == []
 
 
 def test_create_project(auth_header):
