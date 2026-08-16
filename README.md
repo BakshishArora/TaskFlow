@@ -84,8 +84,10 @@ make format
 ## API overview
 
 - `POST /auth/login` - login, or create the user on first login; returns a JWT
+- `GET /auth/users` - get the current user's details
 - `DELETE /auth/users` - delete the current user
 - `GET /health` - health check
+- `GET /metrics` - list all recorded API metrics (public, no auth required)
 - `GET/POST /projects` - list/create projects
 - `PUT/DELETE /projects/{project_id}` - update/delete a project
 - `GET/POST /projects/{project_id}/tasks` - list/create tasks (list is cached in Redis)
@@ -93,6 +95,12 @@ make format
 
 All `/projects` and `/auth/users` routes require the `Authorization: Bearer <token>`
 header.
+
+## Metrics
+
+Authenticated requests to any endpoint are automatically recorded with their
+endpoint path, status code, timestamp, and user id. The `GET /metrics` endpoint
+(public, not itself recorded) returns the full history of these metrics.
 
 ## Docker image
 
