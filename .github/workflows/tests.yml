@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.14"
+
+      - name: Start dependencies (Postgres, Redis)
+        run: docker compose up -d --wait
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Start server
+        run: |
+          uv run uvicorn taskflow.main:app --host 127.0.0.1 --port 8000 &
+          SERVER_PID=$!
+          echo "SERVER_PID=$SERVER_PID" >> "$GITHUB_ENV"
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+              echo "Server is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Server failed to start within 30s" >&2
+          exit 1
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kill $SERVER_PID 2>/dev/null || true
+          docker compose down --volumes
