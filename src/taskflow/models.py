@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from uuid import UUID, uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, String, Uuid
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from taskflow.db import Base
@@ -77,3 +77,15 @@ class Notification(Base):
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
     read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class Metric(Base):
+    __tablename__ = "metrics"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    endpoint: Mapped[str] = mapped_column(String, nullable=False)
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+    )
+    user_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
