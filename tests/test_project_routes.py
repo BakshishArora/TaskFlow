@@ -629,3 +629,62 @@ def test_update_task_missing_task_returns_404(auth_header):
         headers=auth_header,
     )
     assert resp.status_code == 404
+
+
+def test_delete_project_deletes_tasks(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "One", due_date=date(2026, 9, 1)).id
+    resp = client.delete(f"/projects/{pid}", headers=auth_header)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == pid
+    assert body["name"] == "Site"
+    assert projects.get_project(pid) is None
+    assert tasks.get_task(tid) is None
+
+
+def test_delete_project_forbidden_other_users_project(other_auth_header):
+    pid = _create_project("Mine", owner_id=OWNER_1)
+    resp = client.delete(f"/projects/{pid}", headers=other_auth_header)
+    assert resp.status_code == 403
+
+
+def test_delete_project_requires_auth():
+    resp = client.delete(f"/projects/{uuid4()}")
+    assert resp.status_code == 401
+
+
+def test_delete_project_missing_returns_404(auth_header):
+    resp = client.delete(f"/projects/{uuid4()}", headers=auth_header)
+    assert resp.status_code == 404
+
+
+def test_delete_task(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "One", due_date=date(2026, 9, 1)).id
+    resp = client.delete(f"/projects/{pid}/tasks/{tid}", headers=auth_header)
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == tid
+    assert tasks.get_task(tid) is None
+    assert projects.get_project(pid) is not None
+
+
+def test_delete_task_forbidden_other_users_project(other_auth_header):
+    pid = _create_project("Mine", owner_id=OWNER_1)
+    tid = tasks.create_task(pid, "One", due_date=date(2026, 9, 1)).id
+    resp = client.delete(f"/projects/{pid}/tasks/{tid}", headers=other_auth_header)
+    assert resp.status_code == 403
+
+
+def test_delete_task_missing_project_returns_404(auth_header):
+    resp = client.delete(
+        f"/projects/{uuid4()}/tasks/{uuid4()}", headers=auth_header
+    )
+    assert resp.status_code == 404
+
+
+def test_delete_task_missing_task_returns_404(auth_header):
+    pid = _create_project("Site", owner_id=OWNER_1)
+    resp = client.delete(f"/projects/{pid}/tasks/{uuid4()}", headers=auth_header)
+    assert resp.status_code == 404

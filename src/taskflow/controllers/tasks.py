@@ -144,11 +144,12 @@ def update_task(
     return Task.model_validate(row)
 
 
-def delete_task(task_id: str) -> bool:
+def delete_task(task_id: str) -> Task | None:
     with SessionLocal() as session:
         row = session.get(TaskModel, task_id)
         if row is None:
-            return False
+            return None
+        task = Task.model_validate(row)
         session.delete(row)
         session.commit()
-        return True
+        return task

@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from taskflow.db import SessionLocal
 from taskflow.models import Project as ProjectModel
+from taskflow.models import Task as TaskModel
 from taskflow.utils.validators import validate_title
 
 
@@ -12,7 +13,7 @@ class Project(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
-    owner_id: UUID
+    owner_id: UUID | None
 
     @field_validator("name")
     @classmethod
@@ -69,3 +70,15 @@ def list_projects(owner_id: UUID) -> list[Project]:
             session.query(ProjectModel).filter(ProjectModel.owner_id == owner_id).all()
         )
         return [Project.model_validate(row) for row in rows]
+
+
+def delete_project(project_id: str) -> Project | None:
+    with SessionLocal() as session:
+        row = session.get(ProjectModel, project_id)
+        if row is None:
+            return None
+        project = Project.model_validate(row)
+        session.query(TaskModel).filter(TaskModel.project_id == project_id).delete()
+        session.delete(row)
+        session.commit()
+        return project

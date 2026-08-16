@@ -3,6 +3,8 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field
 
 from taskflow.db import SessionLocal
+from taskflow.models import Project as ProjectModel
+from taskflow.models import Task as TaskModel
 from taskflow.models import User as UserModel
 from taskflow.utils.passwords import hash_password
 
@@ -54,3 +56,32 @@ def list_users() -> list[User]:
     with SessionLocal() as session:
         rows = session.query(UserModel).all()
         return [User.model_validate(row) for row in rows]
+
+
+def delete_user(user_id: UUID) -> User | None:
+    with SessionLocal() as session:
+        row = session.get(UserModel, str(user_id))
+        if row is None:
+            return None
+        user = User.model_validate(row)
+        orphaned_project_ids = [
+            pid
+            for (pid,) in (
+                session.query(ProjectModel.id)
+                .filter(ProjectModel.owner_id == user_id)
+                .all()
+            )
+        ]
+        session.query(ProjectModel).filter(ProjectModel.owner_id == user_id).update(
+            {ProjectModel.owner_id: None}
+        )
+        if orphaned_project_ids:
+            session.query(TaskModel).filter(
+                TaskModel.project_id.in_(orphaned_project_ids)
+            ).update({TaskModel.assignee: "Orphaned"})
+        session.query(TaskModel).filter(TaskModel.assignee == str(user_id)).update(
+            {TaskModel.assignee: "Orphaned"}
+        )
+        session.delete(row)
+        session.commit()
+        return user

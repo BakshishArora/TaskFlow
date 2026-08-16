@@ -27,7 +27,7 @@ class Project(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    owner_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)
+    owner_id: Mapped[UUID | None] = mapped_column(Uuid, nullable=True, index=True)
 
 
 class User(Base):

@@ -179,3 +179,21 @@ def update_task(
     if updated is None:
         raise HTTPException(status_code=404, detail="task not found")
     return updated
+
+
+@router.delete("/{project_id}")
+def delete_project(project_id: UUID, user_id: CurrentUser):
+    _require_owned_project(str(project_id), user_id)
+    deleted = projects.delete_project(str(project_id))
+    if deleted is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    return deleted
+
+
+@router.delete("/{project_id}/tasks/{task_id}")
+def delete_task(project_id: UUID, task_id: UUID, user_id: CurrentUser):
+    _require_owned_project(str(project_id), user_id)
+    deleted = tasks.delete_task(str(task_id))
+    if deleted is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    return deleted

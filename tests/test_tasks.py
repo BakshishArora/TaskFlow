@@ -7,6 +7,8 @@ from taskflow.controllers import projects, tasks
 
 OWNER_1 = uuid4()
 
+FUTURE_DATE = datetime.now(UTC).date() + timedelta(days=30)
+
 
 @pytest.fixture(autouse=True)
 def reset_store():
@@ -68,8 +70,8 @@ def test_list_filters_by_project(project_id):
 
 
 def test_list_filters_by_status(project_id):
-    done = tasks.create_task(project_id, "Done", due_date=date(2026, 9, 1))
-    tasks.update_task(done.id, status="done", due_date=date(2026, 9, 1))
+    done = tasks.create_task(project_id, "Done", due_date=FUTURE_DATE)
+    tasks.update_task(done.id, status="done", due_date=FUTURE_DATE)
     tasks.create_task(project_id, "Todo", due_date=date(2026, 9, 1))
     page = tasks.list_tasks(project_id, status="done")
     assert [t.title for t in page.items] == ["Done"]
@@ -101,10 +103,10 @@ def test_list_filters_by_due_date_range(project_id):
 
 def test_list_filters_combine(project_id):
     done = tasks.create_task(
-        project_id, "Done alice", assignee="alice", due_date=date(2026, 8, 15)
+        project_id, "Done alice", assignee="alice", due_date=FUTURE_DATE
     )
-    tasks.update_task(done.id, status="done", due_date=date(2026, 8, 15))
-    tasks.create_task(project_id, "Todo alice", assignee="alice", due_date=date(2026, 9, 1))
+    tasks.update_task(done.id, status="done", due_date=FUTURE_DATE)
+    tasks.create_task(project_id, "Todo alice", assignee="alice", due_date=FUTURE_DATE)
     page = tasks.list_tasks(project_id, status="done", assignee="alice")
     assert [t.title for t in page.items] == ["Done alice"]
 
@@ -138,16 +140,16 @@ def test_get_missing_returns_none():
 
 
 def test_update_task(project_id):
-    t = tasks.create_task(project_id, "Old", due_date=date(2026, 8, 20))
+    t = tasks.create_task(project_id, "Old", due_date=FUTURE_DATE)
     updated = tasks.update_task(
         t.id,
         status="done",
         assignee="bob",
-        due_date=date(2026, 8, 20),
+        due_date=FUTURE_DATE,
     )
     assert updated.status == "done"
     assert updated.assignee == "bob"
-    assert updated.due_date == date(2026, 8, 20)
+    assert updated.due_date == FUTURE_DATE
 
 
 def test_update_task_assignee(project_id):
@@ -185,5 +187,5 @@ def test_update_expired_due_date_raises(project_id):
 
 def test_delete_task(project_id):
     t = tasks.create_task(project_id, "Gone", due_date=date(2026, 9, 1))
-    assert tasks.delete_task(t.id) is True
+    assert tasks.delete_task(t.id) is not None
     assert tasks.get_task(t.id) is None
