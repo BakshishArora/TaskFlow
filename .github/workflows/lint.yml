@@ -18,7 +18,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Lint
-        run: uv run ruff check
+        run: make lint
 
       - name: Format check
-        run: uv run ruff format --check
+        run: make format-check
